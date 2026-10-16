@@ -1,0 +1,285 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Roles: OWNER, COUNSELOR, TRAINER, ACCOUNTS
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  role      String   // OWNER | COUNSELOR | TRAINER | ACCOUNTS
+  trainerId String?  // Linked trainer record if role == TRAINER
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "Room 101 - Turing Lab", "Room 202 - Ada Hall"
+  capacity  Int
+  type      String   // LAB | CLASSROOM | SEMINAR_HALL
+  features  String?  // JSON or comma list: Projector, 30 iMacs, AC
+  batches   Batch[]
+  createdAt DateTime @default(now())
+}
+
+model Trainer {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  phone             String
+  specializations   String   // e.g. "Java, Spring Boot, Microservices"
+  maxHoursPerWeek   Int      @default(30)
+  availabilitySlots String   // JSON array of available time windows: [{"day":"MON","start":"09:00","end":"14:00"},...]
+  isAvailable       Boolean  @default(true) // Quick toggle for re-plan demo
+  batches           Batch[]
+  createdAt         DateTime @default(now())
+}
+
+model Course {
+  id            String   @id @default(uuid())
+  code          String   @unique // e.g. "JAVA-FS", "PY-DS", "UIUX-PRO"
+  name          String
+  category      String   // Engineering, Data, Design, Marketing
+  durationWeeks Int
+  totalHours    Int
+  syllabusSummary String?
+  baseFee       Float
+  batches       Batch[]
+  certificates  Certificate[]
+  createdAt     DateTime @default(now())
+}
+
+model Batch {
+  id              String   @id @default(uuid())
+  code            String   @unique // e.g. "JAVA-2026-B1", "PY-2026-M1"
+  name            String
+  courseId        String
+  course          Course   @relation(fields: [courseId], references: [id])
+  trainerId       String
+  trainer         Trainer  @relation(fields: [trainerId], references: [id])
+  roomId          String?
+  room            Room?    @relation(fields: [roomId], references: [id])
+  mode            String   @default("HYBRID") // CLASSROOM | ONLINE | HYBRID
+  daysOfWeek      String   // e.g. "MON,WED,FRI" or "TUE,THU,SAT"
+  startTime       String   // e.g. "10:00"
+  endTime         String   // e.g. "12:00"
+  startDate       DateTime
+  endDate         DateTime
+  maxStudents     Int      @default(35)
+  onlineSeatLimit Int      @default(50)
+  status          String   @default("ACTIVE") // UPCOMING | ACTIVE | COMPLETED
+  enrollments     Enrollment[]
+  attendances     AttendanceRecord[]
+  assignments     Assignment[]
+  recordings      Recording[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Student {
+  id            String   @id @default(uuid())
+  rollNo        String   @unique // e.g. "STU-2026-001"
+  name          String
+  email         String   @unique
+  phone         String
+  whatsappNo    String?
+  guardianPhone String?
+  city          String   @default("Bengaluru")
+  status        String   @default("ENROLLED") // ENROLLED | COMPLETED | DROPPED | AT_RISK
+  
+  // Explainable Dropout Risk
+  riskScore     Float    @default(15.0) // 0 - 100
+  riskLevel     String   @default("LOW") // LOW | MEDIUM | HIGH
+  riskReasons   String   @default("[]") // JSON string of specific flags
+
+  enrollments   Enrollment[]
+  feePlans      FeePlan[]
+  instalments   Instalment[]
+  payments      Payment[]
+  attendances   AttendanceRecord[]
+  submissions   Submission[]
+  certificates  Certificate[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Enrollment {
+  id         String   @id @default(uuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batchId    String
+  batch      Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  enrolledAt DateTime @default(now())
+  status     String   @default("ACTIVE") // ACTIVE | COMPLETED | DROPPED
+
+  @@unique([studentId, batchId])
+}
+
+model FeePlan {
+  id              String       @id @default(uuid())
+  studentId       String
+  student         Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batchId         String?
+  totalAmount     Float
+  discountAmount  Float        @default(0.0)
+  payableAmount   Float
+  instalmentCount Int          @default(3)
+  instalments     Instalment[]
+  createdAt       DateTime     @default(now())
+}
+
+model Instalment {
+  id           String    @id @default(uuid())
+  feePlanId    String
+  feePlan      FeePlan   @relation(fields: [feePlanId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  instalmentNo Int
+  dueDate      DateTime
+  amount       Float
+  status       String    @default("DUE") // PAID | DUE | OVERDUE
+  paidAmount   Float     @default(0.0)
+  paidAt       DateTime?
+  payments     Payment[]
+  createdAt    DateTime  @default(now())
+}
+
+model Payment {
+  id             String      @id @default(uuid())
+  instalmentId   String?
+  instalment     Instalment? @relation(fields: [instalmentId], references: [id])
+  studentId      String
+  student        Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount         Float
+  paymentDate    DateTime    @default(now())
+  source         String      @default("UPI") // UPI | BANK_TRANSFER | CASH | CARD
+  transactionRef String      @unique // UTR / Transaction ID
+  receiptNo      String      @unique
+  remarks        String?
+  createdAt      DateTime    @default(now())
+}
+
+model AttendanceRecord {
+  id                     String    @id @default(uuid())
+  studentId              String
+  student                Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batchId                String
+  batch                  Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  date                   DateTime
+  status                 String    @default("PRESENT") // PRESENT | ABSENT | LATE
+  mode                   String    @default("CLASSROOM") // CLASSROOM | ONLINE
+  checkInTime            DateTime?
+  checkOutTime           DateTime?
+  onlineJoinDurationMins Int?
+  notes                  String?
+  createdAt              DateTime  @default(now())
+
+  @@index([batchId, date])
+  @@index([studentId])
+}
+
+model Assignment {
+  id          String       @id @default(uuid())
+  batchId     String
+  batch       Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  dueDate     DateTime
+  maxScore    Int          @default(100)
+  submissions Submission[]
+  createdAt   DateTime     @default(now())
+}
+
+model Submission {
+  id           String     @id @default(uuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedAt  DateTime   @default(now())
+  score        Float?
+  status       String     @default("SUBMITTED") // SUBMITTED | GRADED | LATE | PENDING
+  feedback     String?
+
+  @@unique([assignmentId, studentId])
+}
+
+model Recording {
+  id           String   @id @default(uuid())
+  batchId      String
+  batch        Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sessionTitle String
+  sessionDate  DateTime
+  durationMins Int      @default(90)
+  videoUrl     String
+  passcode     String?
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+model Certificate {
+  id               String   @id @default(uuid())
+  certificateNo    String   @unique // e.g. "CERT-2026-8812"
+  studentId        String
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId         String
+  course           Course   @relation(fields: [courseId], references: [id])
+  issueDate        DateTime @default(now())
+  verificationCode String   @unique
+  grade            String   @default("Distinction")
+  status           String   @default("ISSUED") // ISSUED | REVOKED
+  qrCodeUrl        String?
+}
+
+model ReconciliationRecord {
+  id                 String    @id @default(uuid())
+  utrRef             String    @unique
+  senderName         String
+  amount             Float
+  statementDate      DateTime
+  matchedInstalmentId String?
+  status             String    @default("UNMATCHED") // MATCHED | PARTIAL | UNMATCHED | DUPLICATE
+  confidenceScore    Float?    // 0 - 1.0
+  remarks            String?
+  createdAt          DateTime  @default(now())
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  userId         String
+  userName       String
+  role           String
+  action         String   // COPILOT_QUERY | COPILOT_ACTION_APPROVE | RESCHEDULE | PAYMENT_MATCH | ATTENDANCE_MARK
+  prompt         String?
+  query          String?
+  tablesTouched  String?  // comma-separated or JSON
+  rowCount       Int?
+  executionTimeMs Int?
+  details        String?
+  createdAt      DateTime @default(now())
+}
+
+model CopilotAction {
+  id                  String    @id @default(uuid())
+  userId              String
+  userName            String
+  role                String
+  actionType          String    // WHATSAPP_REMINDER | RESCHEDULE_BATCH | MARK_ATTENDANCE | APPLY_FEE_CONCESSION
+  title               String
+  description         String
+  payload             String    // JSON string with structured instructions/messages
+  diffSummary         String    // JSON string showing before/after diff
+  affectedCount       Int       @default(1)
+  status              String    @default("PENDING") // PENDING | APPROVED | REJECTED | EXECUTED
+  createdAt           DateTime  @default(now())
+  reviewedAt          DateTime?
+  reviewedBy          String?
+  executionResult     String?
+}

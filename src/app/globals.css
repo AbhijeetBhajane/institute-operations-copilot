@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-serif: 'Fraunces', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --bg-primary: #FAF7F2;
+  --bg-card: #FFFFFF;
+  --text-primary: #14213D;
+  --text-muted: #52607B;
+  --border-subtle: #E2D8C9;
+}
+
+.dark {
+  --bg-primary: #121316;
+  --bg-card: #1D1E24;
+  --text-primary: #F1F5F9;
+  --text-muted: #94A3B8;
+  --border-subtle: #2D3039;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Stamped Approval Slip effect */
+.approval-stamp {
+  border: 3px double #F5A623;
+  color: #D98207;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transform: rotate(-3deg);
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  box-shadow: 0 0 0 2px rgba(245, 166, 35, 0.2);
+}
+
+.approval-stamp-executed {
+  border: 3px double #0F766E;
+  color: #0F766E;
+  transform: rotate(-1deg);
+}
+
+/* Terminal Receipt styled panel */
+.terminal-receipt {
+  background: #14213D;
+  color: #F8FAFC;
+  font-family: var(--font-mono);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 30px -5px rgba(20, 33, 61, 0.3);
+  position: relative;
+}
+
+.receipt-zigzag {
+  background: radial-gradient(circle, transparent, transparent 50%, #FAF7F2 50%, #FAF7F2 100% );
+  background-size: 16px 16px;
+}
+
+/* Glowing Risk Pulse */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 0.4; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.pulse-high {
+  animation: pulse-ring 2s infinite ease-in-out;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(82, 96, 123, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 96, 123, 0.45);
+}
