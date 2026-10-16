@@ -150,3 +150,4 @@ Expected output:
 - **Night Shift**: High-contrast dark mode toggle with identical character.
 - **Typography**: Display headings in *Fraunces* serif, UI elements in *Inter*, and query receipt panels in *JetBrains Mono*.
 - **Micro-interactions**: Glowing pulse indicators on at-risk students, stamped approval slip animations, and terminal receipt aesthetics.
+# institution-copilot
