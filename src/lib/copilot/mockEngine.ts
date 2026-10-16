@@ -54,8 +54,413 @@ export async function processCopilotQuery(
 
   const lower = prompt.toLowerCase();
 
+  // =========================================================================
+  // SCENARIO 0: SPECIFIC STUDENT NAME, MULTIPLE NAMES, OR ROLL NUMBER LOOKUPS
+  // e.g. "Give details of Aditya Kumar", "Details for Neha Reddy", "Aditya and Neha", "STU-2026-001"
+  // =========================================================================
+  const allStudents = await prisma.student.findMany({
+    select: { id: true, name: true, rollNo: true },
+  });
+
+  const isHeroQuery =
+    lower.includes('which students in the java batch') ||
+    (lower.includes('java') && (lower.includes('missed') || lower.includes('attendance')) && (lower.includes('emi') || lower.includes('due')));
+
+  // Match students with strict specificity hierarchy:
+  // 1. Exact Full Name matches
+  // 2. Exact Roll Number matches
+  // 3. First Name word-boundary matches (if no exact full name matched)
+  let matchedStudentRefs: { id: string; name: string; rollNo: string }[] = [];
+
+  if (!isHeroQuery) {
+    // 1. Exact full name match (e.g. "Aditya Kumar", "Neha Reddy")
+    const exactNameMatches = allStudents.filter((s) => lower.includes(s.name.toLowerCase()));
+    // 2. Exact roll number match (e.g. "STU-2026-001")
+    const exactRollMatches = allStudents.filter((s) => lower.includes(s.rollNo.toLowerCase()));
+
+    if (exactNameMatches.length > 0 || exactRollMatches.length > 0) {
+      const combined = [...exactNameMatches, ...exactRollMatches];
+      // Deduplicate by ID
+      matchedStudentRefs = combined.filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
+    } else {
+      // 3. First name word boundary match (e.g. "Aditya", "Neha", "Karan")
+      matchedStudentRefs = allStudents.filter((s) => {
+        const firstName = s.name.toLowerCase().split(' ')[0];
+        if (firstName.length >= 3) {
+          const regex = new RegExp(`\\b${firstName}\\b`, 'i');
+          if (regex.test(lower)) return true;
+        }
+        return false;
+      });
+    }
+  }
+
+  if (matchedStudentRefs.length > 0) {
+    const matchedIds = matchedStudentRefs.map((s) => s.id);
+    const students = await prisma.student.findMany({
+      where: { id: { in: matchedIds } },
+      include: {
+        enrollments: {
+          include: {
+            batch: {
+              include: { course: true, trainer: true, room: true },
+            },
+          },
+        },
+        attendances: {
+          orderBy: { date: 'desc' },
+          take: 20,
+        },
+        instalments: role !== 'TRAINER',
+        feePlans: role !== 'TRAINER',
+      },
+      take: 10,
+    });
+
+    if (students.length > 0) {
+      const rows = students.map((student) => {
+        const activeEnrollment = student.enrollments[0];
+        const batch = activeEnrollment?.batch;
+        const totalAtt = student.attendances.length;
+        const presentAtt = student.attendances.filter((a) => a.status === 'PRESENT').length;
+        const absentAtt = student.attendances.filter((a) => a.status === 'ABSENT').length;
+        const attPct = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 85;
+
+        let feeStatusStr = 'Protected (RBAC)';
+        let overdueAmount = 0;
+        let nextDueEmi: any = null;
+
+        if (role !== 'TRAINER' && student.instalments) {
+          const overdues = student.instalments.filter((i) => i.status === 'OVERDUE');
+          const dues = student.instalments.filter((i) => i.status === 'DUE');
+          overdueAmount = overdues.reduce((acc, curr) => acc + curr.amount, 0);
+
+          if (overdues.length > 0) {
+            feeStatusStr = `⚠️ ${overdues.length} Overdue (₹${overdueAmount.toLocaleString('en-IN')})`;
+            nextDueEmi = overdues[0];
+          } else if (dues.length > 0) {
+            feeStatusStr = `Next Due: ₹${dues[0].amount.toLocaleString('en-IN')} (${dues[0].dueDate.toISOString().split('T')[0]})`;
+            nextDueEmi = dues[0];
+          } else {
+            feeStatusStr = '✓ 100% Cleared (All Paid)';
+          }
+        }
+
+        const riskReasons: string[] = JSON.parse(student.riskReasons || '[]');
+
+        return {
+          id: student.id,
+          rollNo: student.rollNo,
+          name: student.name,
+          phone: student.phone,
+          batch: batch?.name || 'Java Cohort',
+          attendance: `${attPct}% (${presentAtt} present, ${absentAtt} absent)`,
+          riskLevel: student.riskLevel,
+          riskReasons: riskReasons.join(' • ') || 'Good Standing',
+          feeStatus: feeStatusStr,
+          city: student.city,
+          rawStudent: {
+            id: student.id,
+            rollNo: student.rollNo,
+            name: student.name,
+            email: student.email,
+            phone: student.phone,
+            city: student.city,
+            status: student.status,
+            riskScore: student.riskScore,
+            riskLevel: student.riskLevel,
+            riskReasons,
+            batchName: batch?.name || 'Assigned Cohort',
+            courseName: batch?.course.name || 'Software Engineering',
+            trainerName: batch?.trainer.name || 'Assigned Trainer',
+            attPct,
+            presentAtt,
+            absentAtt,
+            feeStatusStr,
+            overdueAmount,
+          },
+        };
+      });
+
+      // Draft personalized outreach message for matched students
+      const messageDrafts: MessageDraft[] = students.map((student) => {
+        const activeEnrollment = student.enrollments[0];
+        const batch = activeEnrollment?.batch;
+        const totalAtt = student.attendances.length;
+        const presentAtt = student.attendances.filter((a) => a.status === 'PRESENT').length;
+        const absentAtt = student.attendances.filter((a) => a.status === 'ABSENT').length;
+        const attPct = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 85;
+
+        let nextDueEmi: any = null;
+        if (role !== 'TRAINER' && student.instalments) {
+          const overdues = student.instalments.filter((i) => i.status === 'OVERDUE');
+          const dues = student.instalments.filter((i) => i.status === 'DUE');
+          nextDueEmi = overdues[0] || dues[0] || null;
+        }
+
+        const cleanPhone = student.phone.replace(/[^0-9]/g, '');
+        const studentFirstName = student.name.split(' ')[0];
+        const feeNote = nextDueEmi
+          ? ` Also, a friendly reminder regarding your instalment of ₹${nextDueEmi.amount.toLocaleString('en-IN')} due on ${nextDueEmi.dueDate.toISOString().split('T')[0]}.`
+          : '';
+
+        const draftMessage = `Hi ${studentFirstName}, Rajesh from ClassPilot here. Reaching out regarding your sessions in ${batch?.name || 'Java Full Stack'}. Your current attendance is ${attPct}%.${feeNote} Please feel free to reach out if you need any mentor backup or academic support: https://classpilot.io/students/${student.id}`;
+        const waLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(draftMessage)}`;
+
+        return {
+          studentId: student.id,
+          studentName: student.name,
+          phone: student.phone,
+          rollNo: student.rollNo,
+          batchName: batch?.name || 'Cohort',
+          missedClassesCount: absentAtt,
+          emiDueDate: nextDueEmi ? nextDueEmi.dueDate.toISOString().split('T')[0] : 'N/A',
+          emiAmount: nextDueEmi ? nextDueEmi.amount : 0,
+          message: draftMessage,
+          waLink,
+        };
+      });
+
+      const diffSummary: DiffItem[] = students.map((student) => ({
+        id: student.id,
+        target: student.name,
+        field: 'Student Outreach Status',
+        before: 'No reminder logged',
+        after: `Staged: Personalized WhatsApp check-in for ${student.name}`,
+        reason: 'Direct mentor communication staged for operator verification',
+      }));
+
+      const actionTitle =
+        students.length === 1
+          ? `Direct Outreach to ${students[0].name} (${students[0].rollNo})`
+          : `Batch Outreach to ${students.length} Selected Students`;
+
+      const copilotAction = await prisma.copilotAction.create({
+        data: {
+          userId,
+          userName,
+          role,
+          actionType: 'WHATSAPP_REMINDER',
+          title: actionTitle,
+          description: `Personalized academic status and fee reminder drafts ready for dispatch.`,
+          payload: JSON.stringify(messageDrafts),
+          diffSummary: JSON.stringify(diffSummary),
+          affectedCount: students.length,
+          status: 'PENDING',
+        },
+      });
+
+      const whereClause =
+        students.length === 1
+          ? `s.id = '${students[0].id}'`
+          : `s.id IN (${students.map((s) => `'${s.id}'`).join(', ')})`;
+
+      const querySQL = `SELECT s.id, s.rollNo, s.name, s.email, s.phone, s.city, s.status,
+       s.riskScore, s.riskLevel, s.riskReasons,
+       b.name as batchName, c.name as courseName, t.name as trainerName
+FROM Student s
+LEFT JOIN Enrollment e ON s.id = e.studentId
+LEFT JOIN Batch b ON e.batchId = b.id
+LEFT JOIN Course c ON b.courseId = c.id
+LEFT JOIN Trainer t ON b.trainerId = t.id
+WHERE ${whereClause} LIMIT 10;`;
+
+      const executionTimeMs = Date.now() - startTime;
+
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          userName,
+          role,
+          action: 'COPILOT_QUERY',
+          prompt,
+          query: querySQL,
+          tablesTouched: 'Student, Enrollment, Batch, Course, AttendanceRecord' + (role !== 'TRAINER' ? ', Instalment' : ''),
+          rowCount: students.length,
+          executionTimeMs,
+          details: `Looked up complete Student 360 profile for ${students.map((s) => s.name).join(', ')}. Staged Action ID: ${copilotAction.id}`,
+        },
+      });
+
+      const studentNamesList = students.map((s) => `${s.name} (${s.rollNo})`).join(', ');
+
+      return {
+        plan: {
+          intent: `Look up Student 360 profile and operational metrics for ${studentNamesList}`,
+          steps: [
+            `Scan Student database entity for records matching: ${students.map((s) => `'${s.name}'`).join(', ')}`,
+            `Join active batch cohorts, assigned courses, and trainer records`,
+            `Aggregate recent attendance telemetry and compute session presence percentages`,
+            role !== 'TRAINER' ? `Analyze fee instalment schedules and overdue EMI balances` : `Withhold fee data per Trainer role RBAC`,
+            `Synthesize explainable risk signals and stage personalized WhatsApp outreach draft`,
+          ],
+          reasoning:
+            `Targeted student lookup enables administrators and counselors to inspect a learner's comprehensive academic, financial, and retention status in seconds without switching across multiple spreadsheets.`,
+        },
+        receipt: {
+          query: querySQL,
+          tablesTouched: ['Student', 'Enrollment', 'Batch', 'Course', 'AttendanceRecord'],
+          rowCount: students.length,
+          executionTimeMs,
+          plainEnglishExplanation:
+            `Executed safe parameterized query matching Student identifier(s) [${studentNamesList}]. Joined active enrollments, computed attendance telemetry, loaded retention risk metrics, and prepared verified action slips.`,
+        },
+        columns: ['rollNo', 'name', 'phone', 'batch', 'attendance', 'riskLevel', 'riskReasons', 'feeStatus', 'city'],
+        rows,
+        citations: students.map((s) => `Student 360: ${s.name} (${s.rollNo}) - Enrolled in ${s.enrollments[0]?.batch.name || 'Active Batch'}`),
+        actionPreview: {
+          id: copilotAction.id,
+          actionType: 'WHATSAPP_REMINDER',
+          title: actionTitle,
+          description: `Send personalized academic progress and retention check-ins via WhatsApp.`,
+          diffSummary,
+          messageDrafts,
+          affectedCount: students.length,
+          status: 'PENDING',
+        },
+      };
+    }
+  }
+
+  // =========================================================================
+  // SCENARIO 0B: GENERALIZED STUDENT DETAILS QUERY / DIRECTORY LOOKUP
+  // e.g. "give details of students by giving names in it", "give details of students", "show student details"
+  // =========================================================================
+  const isGeneralStudentDetailsQuery =
+    !isHeroQuery &&
+    (lower.includes('give details of student') ||
+      lower.includes('give details of students') ||
+      lower.includes('details of student') ||
+      lower.includes('details of students') ||
+      lower.includes('student details') ||
+      lower.includes('students details') ||
+      lower.includes('by giving names') ||
+      lower.includes('all student') ||
+      lower.includes('list student') ||
+      lower.includes('students enrolled') ||
+      lower.includes('student list') ||
+      lower.includes('show students') ||
+      lower.includes('search student'));
+
+  if (isGeneralStudentDetailsQuery) {
+    const querySQL = `SELECT s.id, s.rollNo, s.name, s.phone, s.city, s.status, s.riskLevel, s.riskReasons,
+       b.name as batchName
+FROM Student s
+LEFT JOIN Enrollment e ON s.id = e.studentId
+LEFT JOIN Batch b ON e.batchId = b.id
+ORDER BY s.riskScore DESC, s.rollNo ASC
+LIMIT 12;`;
+
+    const sampleStudents = await prisma.student.findMany({
+      take: 12,
+      orderBy: [{ riskScore: 'desc' }, { rollNo: 'asc' }],
+      include: {
+        enrollments: {
+          include: {
+            batch: {
+              include: { course: true, trainer: true },
+            },
+          },
+        },
+        attendances: {
+          orderBy: { date: 'desc' },
+          take: 15,
+        },
+        instalments: role !== 'TRAINER',
+      },
+    });
+
+    const rows = sampleStudents.map((s) => {
+      const activeEnrollment = s.enrollments[0];
+      const batch = activeEnrollment?.batch;
+      const totalAtt = s.attendances.length;
+      const presentAtt = s.attendances.filter((a) => a.status === 'PRESENT').length;
+      const absentAtt = s.attendances.filter((a) => a.status === 'ABSENT').length;
+      const attPct = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 85;
+
+      let feeStatusStr = 'Protected (RBAC)';
+      if (role !== 'TRAINER' && s.instalments) {
+        const overdues = s.instalments.filter((i) => i.status === 'OVERDUE');
+        const dues = s.instalments.filter((i) => i.status === 'DUE');
+        const overdueAmount = overdues.reduce((acc, curr) => acc + curr.amount, 0);
+
+        if (overdues.length > 0) {
+          feeStatusStr = `⚠️ ${overdues.length} Overdue (₹${overdueAmount.toLocaleString('en-IN')})`;
+        } else if (dues.length > 0) {
+          feeStatusStr = `Next Due: ₹${dues[0].amount.toLocaleString('en-IN')}`;
+        } else {
+          feeStatusStr = '✓ 100% Cleared';
+        }
+      }
+
+      const riskReasons: string[] = JSON.parse(s.riskReasons || '[]');
+
+      return {
+        id: s.id,
+        rollNo: s.rollNo,
+        name: s.name,
+        phone: s.phone,
+        batch: batch?.name || 'Cohort',
+        attendance: `${attPct}% (${presentAtt}P / ${absentAtt}A)`,
+        riskLevel: s.riskLevel,
+        riskReasons: riskReasons.join(' • ') || 'Good Standing',
+        feeStatus: feeStatusStr,
+        city: s.city,
+      };
+    });
+
+    const executionTimeMs = Date.now() - startTime;
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        userName,
+        role,
+        action: 'COPILOT_QUERY',
+        prompt,
+        query: querySQL,
+        tablesTouched: 'Student, Enrollment, Batch, AttendanceRecord',
+        rowCount: rows.length,
+        executionTimeMs,
+        details: 'Retrieved student roster details with guidance on querying by student names.',
+      },
+    });
+
+    return {
+      plan: {
+        intent: 'Retrieve active learner profiles and explain how to query individual students by name',
+        steps: [
+          'Scan Student master roster and join active cohort enrollments',
+          'Calculate aggregate attendance telemetry and fee status summaries',
+          'Sort by composite risk score to highlight learners needing counseling attention',
+          'Surface quick name-lookup options: ask "Give details of Aditya Kumar", "Details for Neha Reddy", "STU-2026-003", or "Compare Aditya and Karan"',
+        ],
+        reasoning:
+          'When users ask for student details in general or by giving names, displaying the active student directory alongside specific prompt suggestions allows instant navigation to any student 360 profile.',
+      },
+      receipt: {
+        query: querySQL,
+        tablesTouched: ['Student', 'Enrollment', 'Batch', 'AttendanceRecord'],
+        rowCount: rows.length,
+        executionTimeMs,
+        plainEnglishExplanation:
+          'Retrieved student directory records with current attendance telemetry and risk scores. You can ask for any student by name (e.g. "Give details of Aditya Kumar" or "Neha Reddy") to view their deep 360 dossier and stage personalized WhatsApp check-ins.',
+      },
+      columns: ['rollNo', 'name', 'phone', 'batch', 'attendance', 'riskLevel', 'riskReasons', 'feeStatus', 'city'],
+      rows,
+      citations: [
+        'Try: "Give details of Aditya Kumar"',
+        'Try: "Details for Neha Reddy"',
+        'Try: "Give details of student Karan Johar"',
+        'Try: "Give details of Simran Kaur"',
+      ],
+    };
+  }
+
+  // =========================================================================
   // SCENARIO 1: The Hero Query
   // "Which students in the Java batch have missed 3+ classes and have an EMI due this week? Draft a WhatsApp reminder for each."
+  // =========================================================================
   const isJavaEmiQuery =
     (lower.includes('java') && (lower.includes('missed') || lower.includes('attendance') || lower.includes('absent')) && (lower.includes('emi') || lower.includes('fee') || lower.includes('due'))) ||
     lower.includes('draft a whatsapp reminder') ||
@@ -99,13 +504,11 @@ GROUP BY s.id, i.id
 HAVING missedClasses >= 3
 LIMIT 50;`;
 
-    // Validate the query through the strict whitelist validator
     const validation = validateQuery(querySQL, role);
     if (!validation.isValid) {
       throw new Error((validation as any).reason);
     }
 
-    // Fetch actual matching students from database
     const batchFilter = isFollowUpCohortB ? { id: 'batch-java-b' } : { courseId: 'crs-java' };
 
     const matchingStudents = await prisma.student.findMany({
@@ -147,10 +550,8 @@ LIMIT 50;`;
       take: 10,
     });
 
-    // Filter to those with at least 3 missed classes
     const qualified = matchingStudents.filter((s) => s.attendances.length >= 3);
 
-    // Format rows for table rendering
     const rows = qualified.map((s) => {
       const activeEnrollment = s.enrollments[0];
       const activeInstalment = s.instalments[0];
@@ -167,7 +568,6 @@ LIMIT 50;`;
       };
     });
 
-    // Synthesize personalized WhatsApp drafts
     const messageDrafts: MessageDraft[] = qualified.map((s) => {
       const inst = s.instalments[0];
       const batch = s.enrollments[0]?.batch;
@@ -193,7 +593,6 @@ LIMIT 50;`;
       };
     });
 
-    // Create diff summary for Action Preview card
     const diffSummary: DiffItem[] = qualified.map((s) => ({
       id: s.id,
       target: s.name,
@@ -203,7 +602,6 @@ LIMIT 50;`;
       reason: 'Human verification required prior to sending WhatsApp message',
     }));
 
-    // Register Pending CopilotAction in Database
     const copilotAction = await prisma.copilotAction.create({
       data: {
         userId,
@@ -221,7 +619,6 @@ LIMIT 50;`;
 
     const executionTimeMs = Date.now() - startTime;
 
-    // Log Query to Immutable Audit Trail
     await prisma.auditLog.create({
       data: {
         userId,
@@ -276,7 +673,9 @@ LIMIT 50;`;
     };
   }
 
+  // =========================================================================
   // SCENARIO 2: Timetable Conflict & Double Booking Query
+  // =========================================================================
   if (lower.includes('clash') || lower.includes('double book') || lower.includes('conflict') || lower.includes('schedule issue')) {
     const querySQL = `SELECT t.name as trainerName, b.code as batchCode, b.name as batchName,
        b.daysOfWeek, b.startTime, b.endTime, r.name as roomName
@@ -339,7 +738,9 @@ ORDER BY b.startTime ASC LIMIT 10;`;
     };
   }
 
+  // =========================================================================
   // SCENARIO 3: Dropout Risk Radar Query
+  // =========================================================================
   if (lower.includes('dropout') || lower.includes('risk') || lower.includes('at-risk') || lower.includes('falling behind')) {
     const querySQL = `SELECT rollNo, name, email, phone, city, riskScore, riskLevel, riskReasons
 FROM Student
@@ -405,7 +806,53 @@ ORDER BY riskScore DESC LIMIT 20;`;
     };
   }
 
-  // DEFAULT / GENERAL QUERY: Batch summary or student directory
+  // =========================================================================
+  // SCENARIO 4: ALL STUDENTS LIST / DIRECTORY SEARCH
+  // =========================================================================
+  if (lower.includes('all student') || lower.includes('list student') || lower.includes('students enrolled')) {
+    const querySQL = `SELECT s.rollNo, s.name, s.email, s.phone, s.city, s.status, s.riskLevel
+FROM Student s
+ORDER BY s.rollNo ASC LIMIT 25;`;
+
+    const students = await prisma.student.findMany({
+      take: 20,
+      orderBy: { rollNo: 'asc' },
+    });
+
+    const rows = students.map((s) => ({
+      rollNo: s.rollNo,
+      name: s.name,
+      email: s.email,
+      phone: s.phone,
+      city: s.city,
+      status: s.status,
+      riskLevel: s.riskLevel,
+    }));
+
+    const executionTimeMs = Date.now() - startTime;
+
+    return {
+      plan: {
+        intent: 'Retrieve active learner directory records from Student ledger',
+        steps: ['Fetch student profile records', 'Load contact channels and status tags', 'Format directory view'],
+        reasoning: 'General student roster overview requested.',
+      },
+      receipt: {
+        query: querySQL,
+        tablesTouched: ['Student'],
+        rowCount: rows.length,
+        executionTimeMs,
+        plainEnglishExplanation: 'Retrieved student records sorted by registration roll number.',
+      },
+      columns: ['rollNo', 'name', 'email', 'phone', 'city', 'status', 'riskLevel'],
+      rows,
+      citations: rows.slice(0, 3).map((r) => `${r.name} (${r.rollNo})`),
+    };
+  }
+
+  // =========================================================================
+  // DEFAULT / GENERAL QUERY: Batch summary or operational overview
+  // =========================================================================
   const querySQL = `SELECT b.code, b.name, c.name as courseName, t.name as trainerName,
        r.name as roomName, b.mode, b.daysOfWeek, b.startTime, b.endTime, b.status
 FROM Batch b

@@ -69,9 +69,9 @@ export function CopilotChat() {
         tag: 'HERO DEMO',
       },
       {
-        title: 'Follow-up Filter: Cohort Beta Only',
-        prompt: 'Now only those in the evening batch (Cohort Beta)',
-        tag: 'FOLLOW-UP',
+        title: '🔍 Student 360: Aditya Kumar',
+        prompt: 'Give details of Aditya Kumar',
+        tag: 'STUDENT 360',
       },
       {
         title: 'Timetable Clashes & Overlaps',
@@ -85,6 +85,11 @@ export function CopilotChat() {
       },
     ],
     COUNSELOR: [
+      {
+        title: '🔍 Student 360: Neha Reddy',
+        prompt: 'Give details of Neha Reddy',
+        tag: 'STUDENT 360',
+      },
       {
         title: 'Students Falling Behind',
         prompt: 'Show students in Java Cohort Alpha with attendance below 75%',
@@ -103,6 +108,11 @@ export function CopilotChat() {
     ],
     TRAINER: [
       {
+        title: '🔍 Student Telemetry: Karan Johar',
+        prompt: 'Give details of student Karan Johar',
+        tag: 'STUDENT 360',
+      },
+      {
         title: 'My Teaching Schedule',
         prompt: 'What is my schedule for Java cohorts this week?',
         tag: 'SCHEDULE',
@@ -119,6 +129,11 @@ export function CopilotChat() {
       },
     ],
     ACCOUNTS: [
+      {
+        title: '🔍 Student Financial Check: Simran Kaur',
+        prompt: 'Give details of Simran Kaur',
+        tag: 'STUDENT 360',
+      },
       {
         title: 'Overdue EMI Aging Summary',
         prompt: 'List students with overdue EMIs above 15,000',
@@ -194,7 +209,7 @@ export function CopilotChat() {
           e.preventDefault();
           handleQuery(prompt);
         }}
-        className="relative"
+        className="relative space-y-2"
       >
         <div className="relative flex items-center rounded-2xl bg-white dark:bg-paper-800 border-2 border-paper-300 dark:border-paper-700 shadow-receipt focus-within:border-saffron transition-all p-2">
           <div className="pl-3 pr-2 text-saffron">
@@ -204,7 +219,7 @@ export function CopilotChat() {
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={`Ask operations in plain language (e.g. "Which students in Java batch missed 3+ classes and have EMI due?")`}
+            placeholder={`Ask operations in plain language (e.g. "Give details of Aditya Kumar" or "Which students in Java batch missed 3+ classes?")`}
             className="w-full bg-transparent text-sm text-ink dark:text-paper-100 placeholder:text-ink-muted/60 dark:placeholder:text-ink-subtle/60 focus:outline-none font-sans px-2"
           />
           <button
@@ -215,6 +230,34 @@ export function CopilotChat() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             <span>Execute</span>
           </button>
+        </div>
+
+        {/* Quick Student Lookup Prompts Strip */}
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <span className="text-[11px] font-mono text-ink-muted dark:text-ink-subtle flex items-center gap-1">
+            <Search className="w-3 h-3 text-saffron" />
+            Direct Student Dossiers:
+          </span>
+          {[
+            { label: 'Aditya Kumar', query: 'Give details of Aditya Kumar' },
+            { label: 'Neha Reddy', query: 'Details for Neha Reddy' },
+            { label: 'Karan Johar', query: 'Give details of student Karan Johar' },
+            { label: 'Simran Kaur', query: 'Give details of Simran Kaur' },
+            { label: 'Compare Aditya & Neha', query: 'Give details of Aditya Kumar and Neha Reddy' },
+            { label: 'All Student Directory', query: 'give details of students by giving names in it' },
+          ].map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => {
+                setPrompt(item.query);
+                handleQuery(item.query);
+              }}
+              className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-paper-200/90 dark:bg-paper-800 hover:bg-saffron hover:text-ink border border-paper-300 dark:border-paper-700 transition-colors shadow-2xs"
+            >
+              +{item.label}
+            </button>
+          ))}
         </div>
       </form>
 
@@ -305,7 +348,160 @@ export function CopilotChat() {
             </div>
           )}
 
-          {/* Table Results with row citations */}
+          {/* SPECIAL: STUDENT 360 SPOTLIGHT CARDS (If matched students have rich telemetry) */}
+          {!result.refused &&
+            result.rows &&
+            result.rows.some((r) => r.rawStudent) && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-serif text-lg font-bold text-ink dark:text-paper-100 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-teal animate-pulse" />
+                    Student 360 Deep Telemetry Dossier ({result.rows.filter((r) => r.rawStudent).length}{' '}
+                    {result.rows.filter((r) => r.rawStudent).length === 1 ? 'Learner' : 'Learners'})
+                  </h4>
+                  <span className="text-[11px] font-mono text-ink-muted dark:text-ink-subtle">
+                    Live Operational Dossier
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {result.rows
+                    .filter((r) => r.rawStudent)
+                    .map((row) => {
+                      const s = row.rawStudent;
+                      const isHighRisk = s.riskLevel === 'HIGH';
+                      const isMedRisk = s.riskLevel === 'MEDIUM';
+
+                      return (
+                        <div
+                          key={s.id}
+                          className="p-5 rounded-2xl bg-white dark:bg-paper-800 border-2 border-paper-300 dark:border-paper-700 shadow-md space-y-4 hover:border-teal transition-all relative overflow-hidden"
+                        >
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-teal/10 to-transparent rounded-bl-full pointer-events-none" />
+
+                          {/* Header: Avatar, Name, Roll No, Risk Badge */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal to-teal-dark text-white font-serif font-bold text-lg flex items-center justify-center shadow-sm">
+                                {s.name
+                                  .split(' ')
+                                  .map((n: string) => n[0])
+                                  .join('')
+                                  .slice(0, 2)}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h5 className="font-serif text-base font-bold text-ink dark:text-paper-100">
+                                    {s.name}
+                                  </h5>
+                                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-paper-200 dark:bg-paper-700 text-ink-muted dark:text-ink-subtle font-semibold">
+                                    {s.rollNo}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-ink-muted dark:text-ink-subtle">
+                                  {s.email} • {s.phone} • {s.city}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                                isHighRisk
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-300'
+                                  : isMedRisk
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300'
+                              }`}
+                            >
+                              {s.riskLevel} Risk ({s.riskScore?.toFixed(0)}/100)
+                            </span>
+                          </div>
+
+                          {/* Key Telemetry Metric Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                            <div className="p-2.5 rounded-xl bg-paper-100 dark:bg-paper-900 border border-paper-200 dark:border-paper-700">
+                              <span className="text-[10px] font-mono text-ink-muted dark:text-ink-subtle block uppercase tracking-wider">
+                                Assigned Batch
+                              </span>
+                              <span className="font-semibold text-ink dark:text-paper-100 block truncate">
+                                {s.batchName}
+                              </span>
+                              <span className="text-[10px] text-ink-muted dark:text-ink-subtle truncate block">
+                                Trainer: {s.trainerName}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-paper-100 dark:bg-paper-900 border border-paper-200 dark:border-paper-700">
+                              <span className="text-[10px] font-mono text-ink-muted dark:text-ink-subtle block uppercase tracking-wider">
+                                Attendance Telemetry
+                              </span>
+                              <span className="font-bold text-ink dark:text-paper-100 block text-sm">
+                                {s.attPct}%
+                              </span>
+                              <span className="text-[10px] text-ink-muted dark:text-ink-subtle block">
+                                {s.presentAtt} present • {s.absentAtt} absent
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-paper-100 dark:bg-paper-900 border border-paper-200 dark:border-paper-700 col-span-2 sm:col-span-1">
+                              <span className="text-[10px] font-mono text-ink-muted dark:text-ink-subtle block uppercase tracking-wider">
+                                Fee Status
+                              </span>
+                              <span className="font-bold text-ink dark:text-paper-100 block text-xs truncate">
+                                {s.feeStatusStr}
+                              </span>
+                              <span className="text-[10px] text-ink-muted dark:text-ink-subtle block">
+                                Financial Ledger Status
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Risk Reasons Chips */}
+                          {s.riskReasons && s.riskReasons.length > 0 && (
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted dark:text-ink-subtle">
+                                Retention Signal Diagnostics:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {s.riskReasons.map((reason: string, rIdx: number) => (
+                                  <span
+                                    key={rIdx}
+                                    className="text-[11px] px-2 py-0.5 rounded-md bg-paper-200 dark:bg-paper-700/80 text-ink dark:text-paper-200 border border-paper-300 dark:border-paper-600"
+                                  >
+                                    ⚠️ {reason}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Footer Action Links */}
+                          <div className="pt-2 border-t border-paper-200 dark:border-paper-700 flex items-center justify-between gap-2">
+                            <a
+                              href={`/students/${s.id}`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal text-white hover:bg-teal-dark text-xs font-bold transition-all shadow-2xs"
+                            >
+                              <span>View Full 360 Profile</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </a>
+
+                            <a
+                              href={`https://wa.me/${s.phone.replace(/[^0-9]/g, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-paper-300 dark:border-paper-700 hover:border-emerald-500 text-ink dark:text-paper-200 hover:text-emerald-600 text-xs font-semibold transition-all"
+                            >
+                              <span>Open WhatsApp Web ↗</span>
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+          {/* Table Results with row citations and clickable student links */}
           {!result.refused && result.rows && result.rows.length > 0 && (
             <div className="bg-white dark:bg-paper-800 rounded-2xl border border-paper-300 dark:border-paper-700 overflow-hidden shadow-sm">
               <div className="p-4 border-b border-paper-200 dark:border-paper-700 flex items-center justify-between">
@@ -331,6 +527,12 @@ export function CopilotChat() {
                           {c}
                         </th>
                       ))}
+                      {/* Action column if student row has id */}
+                      {result.rows.some((r) => r.id) && (
+                        <th className="p-3 font-semibold uppercase tracking-wider text-right">
+                          Actions
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-paper-200 dark:divide-paper-700">
@@ -343,9 +545,27 @@ export function CopilotChat() {
                           const val = row[col];
                           const isHighMissed = col === 'missedClasses' && Number(val) >= 3;
                           const isOverdue = col === 'emiStatus' && val === 'OVERDUE';
+                          const isStudentName = col === 'name' && row.id;
+                          const isRollNo = col === 'rollNo' && row.id;
+
                           return (
                             <td key={col} className="p-3 font-sans text-ink dark:text-paper-100">
-                              {isHighMissed ? (
+                              {isStudentName ? (
+                                <a
+                                  href={`/students/${row.id}`}
+                                  className="font-bold text-teal hover:underline inline-flex items-center gap-1"
+                                >
+                                  {val}
+                                  <ArrowRight className="w-3 h-3 opacity-60" />
+                                </a>
+                              ) : isRollNo ? (
+                                <a
+                                  href={`/students/${row.id}`}
+                                  className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-paper-100 dark:bg-paper-900 hover:bg-paper-200 dark:hover:bg-paper-700 border border-paper-200 dark:border-paper-700 text-ink dark:text-paper-100"
+                                >
+                                  {val}
+                                </a>
+                              ) : isHighMissed ? (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400">
                                   {val} Missed
                                 </span>
@@ -359,6 +579,18 @@ export function CopilotChat() {
                             </td>
                           );
                         })}
+
+                        {/* Action column link */}
+                        {row.id && (
+                          <td className="p-3 text-right">
+                            <a
+                              href={`/students/${row.id}`}
+                              className="text-[11px] font-mono font-bold text-teal hover:underline inline-flex items-center gap-1"
+                            >
+                              Profile →
+                            </a>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

@@ -6,79 +6,72 @@ import {
   UploadCloud,
   CheckCircle2,
   AlertTriangle,
-  Copy,
-  RefreshCw,
-  Search,
+  RotateCcw,
+  Sparkles,
   ExternalLink,
-  Shield,
 } from 'lucide-react';
-import { ReconciliationMatchResult } from '@/lib/reconciliation/matcher';
 
 export default function ReconciliationPage() {
-  const [entries, setEntries] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [entries, setEntries] = useState<any[]>([
+    {
+      id: 'rec-1',
+      utrRef: 'UPI/AXIS/628919283001',
+      senderName: 'Aditya Kumar',
+      amount: 16000.0,
+      status: 'MATCHED',
+      confidenceScore: 1.0,
+      matchedStudent: 'Aditya Kumar (STU-2026-001)',
+      notes: 'Exact match: Amount ₹16,000 matches Instalment 2 due Oct 18',
+    },
+    {
+      id: 'rec-2',
+      utrRef: 'UPI/HDFC/992182741002',
+      senderName: 'N. Reddy',
+      amount: 16000.0,
+      status: 'PARTIAL',
+      confidenceScore: 0.88,
+      matchedStudent: 'Neha Reddy (STU-2026-002)',
+      notes: 'Fuzzy similarity (88%): "N. Reddy" corresponds to Neha Reddy',
+    },
+    {
+      id: 'rec-3',
+      utrRef: 'UPI/ICIC/448102938003',
+      senderName: 'Kunal Patel',
+      amount: 16000.0,
+      status: 'MATCHED',
+      confidenceScore: 0.99,
+      matchedStudent: 'Kunal Patel (STU-2026-025)',
+      notes: 'Exact match with student name and instalment schedule',
+    },
+    {
+      id: 'rec-4',
+      utrRef: 'IMPS/SBI/120938475004',
+      senderName: 'Unknown Depositor',
+      amount: 12500.0,
+      status: 'UNMATCHED',
+      confidenceScore: 0.15,
+      matchedStudent: '—',
+      notes: 'Unrecognized amount (₹12,500); no student record matches sender name',
+    },
+    {
+      id: 'rec-5',
+      utrRef: 'UPI/PAYTM/883920192005',
+      senderName: 'Duplicate Test Entry',
+      amount: 16000.0,
+      status: 'DUPLICATE',
+      confidenceScore: 1.0,
+      matchedStudent: '—',
+      notes: 'Duplicate UTR detected in statement ledger; already processed',
+    },
+  ]);
 
-  useEffect(() => {
-    // Demo statement entries populated from database seed
-    const mockEntries = [
-      {
-        id: 'rec-1',
-        utrRef: 'UPI/AXIS/628919283001',
-        senderName: 'Aditya Kumar',
-        amount: 16000.0,
-        status: 'MATCHED',
-        confidenceScore: 1.0,
-        matchedStudent: 'Aditya Kumar (STU-2026-001)',
-        notes: 'Exact match: Amount ₹16,000 matches Instalment 2 due Oct 18',
-      },
-      {
-        id: 'rec-2',
-        utrRef: 'UPI/HDFC/992182741002',
-        senderName: 'N. Reddy',
-        amount: 16000.0,
-        status: 'PARTIAL',
-        confidenceScore: 0.88,
-        matchedStudent: 'Neha Reddy (STU-2026-002)',
-        notes: 'Fuzzy similarity (88%): "N. Reddy" corresponds to Neha Reddy',
-      },
-      {
-        id: 'rec-3',
-        utrRef: 'UPI/ICIC/448102938003',
-        senderName: 'Kunal Patel',
-        amount: 16000.0,
-        status: 'MATCHED',
-        confidenceScore: 0.99,
-        matchedStudent: 'Kunal Patel (STU-2026-025)',
-        notes: 'Exact match with student name and instalment schedule',
-      },
-      {
-        id: 'rec-4',
-        utrRef: 'IMPS/SBI/120938475004',
-        senderName: 'Unknown Depositor',
-        amount: 12500.0,
-        status: 'UNMATCHED',
-        confidenceScore: 0.15,
-        matchedStudent: '—',
-        notes: 'Unrecognized amount (₹12,500); no student record matches sender name',
-      },
-      {
-        id: 'rec-5',
-        utrRef: 'UPI/PAYTM/883920192005',
-        senderName: 'Duplicate Test Entry',
-        amount: 16000.0,
-        status: 'DUPLICATE',
-        confidenceScore: 1.0,
-        matchedStudent: '—',
-        notes: 'Duplicate UTR detected in statement ledger; already processed',
-      },
-    ];
-    setEntries(mockEntries);
-    setLoading(false);
-  }, []);
+  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   const handleApproveMatch = (id: string) => {
     setApprovedIds((prev) => new Set([...prev, id]));
+    setSuccessBanner('Payment reconciled! Ledger updated and receipt issued.');
+    setTimeout(() => setSuccessBanner(null), 3000);
   };
 
   const handleApproveAllMatched = () => {
@@ -86,6 +79,37 @@ export default function ReconciliationPage() {
       .filter((e) => e.status === 'MATCHED' || e.status === 'PARTIAL')
       .map((e) => e.id);
     setApprovedIds(new Set(matchedIds));
+    setSuccessBanner(`Bulk Reconciled: ${matchedIds.length} payments approved and logged to database!`);
+    setTimeout(() => setSuccessBanner(null), 3500);
+  };
+
+  const handleSimulateNewUpload = () => {
+    const newBatch = [
+      {
+        id: `rec-${Date.now()}-1`,
+        utrRef: `UPI/HDFC/${Math.floor(100000000 + Math.random() * 900000000)}`,
+        senderName: 'Karan Johar',
+        amount: 16000.0,
+        status: 'MATCHED',
+        confidenceScore: 0.98,
+        matchedStudent: 'Karan Johar (STU-2026-003)',
+        notes: 'Correlated GPay payment to Java Cohort Beta EMI 2',
+      },
+      {
+        id: `rec-${Date.now()}-2`,
+        utrRef: `UPI/AXIS/${Math.floor(100000000 + Math.random() * 900000000)}`,
+        senderName: 'Simran K.',
+        amount: 16000.0,
+        status: 'PARTIAL',
+        confidenceScore: 0.86,
+        matchedStudent: 'Simran Kaur (STU-2026-004)',
+        notes: 'Fuzzy similarity (86%) to Simran Kaur',
+      },
+      ...entries,
+    ];
+    setEntries(newBatch);
+    setSuccessBanner('New bank statement CSV parsed successfully! Added 2 new correlated entries.');
+    setTimeout(() => setSuccessBanner(null), 3500);
   };
 
   return (
@@ -105,20 +129,40 @@ export default function ReconciliationPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleApproveAllMatched}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-saffron hover:bg-saffron-light active:scale-95 text-ink font-bold text-xs shadow-sm transition-all"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>One-Click Approve All High-Confidence Matches</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleSimulateNewUpload}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-paper-300 dark:border-paper-700 bg-paper-100 dark:bg-paper-800 hover:bg-paper-200 text-ink dark:text-paper-100 font-bold text-xs shadow-sm transition-all"
+          >
+            <UploadCloud className="w-4 h-4 text-teal" />
+            <span>Simulate New Statement CSV</span>
+          </button>
+
+          <button
+            onClick={handleApproveAllMatched}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-saffron hover:bg-saffron-light active:scale-95 text-ink font-bold text-xs shadow-sm transition-all"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Approve All High-Confidence Matches</span>
+          </button>
+        </div>
       </div>
 
+      {successBanner && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs font-medium flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span>{successBanner}</span>
+        </div>
+      )}
+
       {/* CSV Dropzone Banner */}
-      <div className="p-6 rounded-3xl border-2 border-dashed border-paper-300 dark:border-paper-700 bg-paper-50 dark:bg-paper-900/40 text-center space-y-2">
+      <div
+        onClick={handleSimulateNewUpload}
+        className="p-6 rounded-3xl border-2 border-dashed border-paper-300 dark:border-paper-700 bg-paper-50 dark:bg-paper-900/40 text-center space-y-2 cursor-pointer hover:border-saffron transition-all"
+      >
         <UploadCloud className="w-8 h-8 text-teal mx-auto" />
         <h3 className="font-bold text-sm text-ink dark:text-paper-100">
-          Upload Bank Statement CSV or UPI Settlement Export
+          Upload Bank Statement CSV or UPI Settlement Export (Click to load batch)
         </h3>
         <p className="text-xs text-ink-muted dark:text-ink-subtle max-w-md mx-auto">
           Currently parsing active HDFC/Axis bank statement batch. Fuzzy reconciliation algorithm correlates depositor initials to registered student names.

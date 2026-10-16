@@ -2,22 +2,48 @@ import React from 'react';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { Layers, Calendar, DoorOpen, Users, Sparkles, ArrowRight } from 'lucide-react';
+import { Layers, Calendar, DoorOpen } from 'lucide-react';
+import { BatchList } from '@/components/batches/BatchList';
 
 export default async function BatchesPage() {
   const user = await getCurrentUser();
 
   const batchWhere = user.role === 'TRAINER' && user.trainerId ? { trainerId: user.trainerId } : {};
-  const batches = await prisma.batch.findMany({
+  const rawBatches = await prisma.batch.findMany({
     where: batchWhere,
     include: {
       course: true,
       trainer: true,
       room: true,
-      enrollments: true,
+      enrollments: {
+        include: { student: true },
+      },
     },
     orderBy: { startDate: 'desc' },
   });
+
+  const batches = rawBatches.map((b) => ({
+    id: b.id,
+    code: b.code,
+    name: b.name,
+    mode: b.mode,
+    daysOfWeek: b.daysOfWeek,
+    startTime: b.startTime,
+    endTime: b.endTime,
+    maxStudents: b.maxStudents,
+    onlineSeatLimit: b.onlineSeatLimit,
+    courseName: b.course.name,
+    trainerName: b.trainer.name,
+    roomName: b.room ? b.room.name : 'Virtual Classroom',
+    roomCapacity: b.room ? b.room.capacity : 35,
+    enrollmentCount: b.enrollments.length,
+    enrollments: b.enrollments.map((e) => ({
+      id: e.student.id,
+      studentName: e.student.name,
+      rollNo: e.student.rollNo,
+      email: e.student.email,
+    })),
+  }));
 
   const rooms = await prisma.room.findMany();
 
@@ -47,83 +73,8 @@ export default async function BatchesPage() {
         </Link>
       </div>
 
-      {/* Batches Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {batches.map((b) => {
-          const capPercent = b.room?.capacity
-            ? Math.round((b.enrollments.length / b.room.capacity) * 100)
-            : 80;
-
-          return (
-            <div
-              key={b.id}
-              className="p-5 rounded-3xl border border-paper-300 dark:border-paper-700 bg-white dark:bg-paper-800 shadow-sm space-y-4 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-paper-200 dark:bg-paper-800 text-ink-muted">
-                    {b.code}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal/10 text-teal">
-                    {b.mode}
-                  </span>
-                </div>
-
-                <h3 className="font-serif text-lg font-bold text-ink dark:text-paper-100 line-clamp-1">
-                  {b.name}
-                </h3>
-
-                <div className="text-xs text-ink-muted dark:text-ink-subtle space-y-1 font-sans">
-                  <p>
-                    <strong className="text-ink dark:text-paper-200">Course:</strong> {b.course.name}
-                  </p>
-                  <p>
-                    <strong className="text-ink dark:text-paper-200">Trainer:</strong> {b.trainer.name}
-                  </p>
-                  <p>
-                    <strong className="text-ink dark:text-paper-200">Venue:</strong>{' '}
-                    {b.room ? b.room.name : 'Online Classroom'}
-                  </p>
-                  <p className="font-mono text-saffron-dark dark:text-saffron font-bold text-[11px]">
-                    🗓️ {b.daysOfWeek} @ {b.startTime} - {b.endTime}
-                  </p>
-                </div>
-
-                {/* Capacity Progress Bar */}
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[11px] font-mono text-ink-muted dark:text-ink-subtle">
-                    <span>Enrollment Capacity</span>
-                    <span>
-                      {b.enrollments.length} / {b.maxStudents} seats
-                    </span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-paper-200 dark:bg-paper-700 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${
-                        capPercent > 90 ? 'bg-amber-500' : 'bg-teal'
-                      }`}
-                      style={{ width: `${Math.min(100, capPercent)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-paper-200 dark:border-paper-700 flex items-center justify-between text-xs">
-                <span className="font-mono text-teal font-medium">
-                  {b.onlineSeatLimit} online seats
-                </span>
-                <Link
-                  href="/students"
-                  className="font-bold text-saffron-dark dark:text-saffron hover:underline flex items-center gap-1"
-                >
-                  <span>Cohort Students</span>
-                  <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Interactive Batch List with filters and student inspection */}
+      <BatchList batches={batches} />
 
       {/* Room Infrastructure Monitor */}
       <div className="bg-white dark:bg-paper-800 rounded-3xl border border-paper-300 dark:border-paper-700 p-6 space-y-4">
