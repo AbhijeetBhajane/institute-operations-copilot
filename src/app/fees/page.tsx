@@ -4,9 +4,20 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { CreditCard, Lock, ArrowRight } from 'lucide-react';
 import { FeesTracker } from '@/components/fees/FeesTracker';
+import { AccessRestrictedCard } from '@/components/layout/AccessRestrictedCard';
 
 export default async function FeesPage() {
   const user = await getCurrentUser();
+
+  if (user.role === 'STUDENT') {
+    return (
+      <AccessRestrictedCard
+        role={user.role}
+        requiredClearance="Accounts or Owner Clearance"
+        reason="The Master Fee & EMI Aging ledger displays institute-wide financial balances across all cohorts. As a Student, your personal fee receipts and upcoming instalments are available directly in your learning portal."
+      />
+    );
+  }
 
   // STRICT SERVER-SIDE ENFORCEMENT: Trainer is strictly prohibited
   if (user.role === 'TRAINER') {

@@ -55,6 +55,128 @@ export async function processCopilotQuery(
   const lower = prompt.toLowerCase();
 
   // =========================================================================
+  // SCENARIO 00: STUDENT PORTAL PERSONAL QUERIES (ROLE: STUDENT)
+  // e.g. "What is my attendance percentage?", "When is my next fee instalment due?",
+  // "What is my schedule this week?", "Show my batch details"
+  // =========================================================================
+  if (role === 'STUDENT') {
+    const student = await prisma.student.findUnique({
+      where: { id: 'stu-001' }, // Default authenticated demo student (Aditya Kumar)
+      include: {
+        enrollments: {
+          include: {
+            batch: {
+              include: { course: true, trainer: true, room: true },
+            },
+          },
+        },
+        attendances: {
+          orderBy: { date: 'desc' },
+          take: 20,
+        },
+        instalments: {
+          orderBy: { instalmentNo: 'asc' },
+        },
+      },
+    });
+
+    if (student) {
+      const activeEnrollment = student.enrollments[0];
+      const batch = activeEnrollment?.batch;
+      const totalAtt = student.attendances.length;
+      const presentAtt = student.attendances.filter((a) => a.status === 'PRESENT').length;
+      const absentAtt = student.attendances.filter((a) => a.status === 'ABSENT').length;
+      const attPct = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 80;
+
+      const overdues = student.instalments.filter((i) => i.status === 'OVERDUE');
+      const dues = student.instalments.filter((i) => i.status === 'DUE');
+      const nextDueEmi = overdues[0] || dues[0] || null;
+
+      const feeStatusStr = nextDueEmi
+        ? `Next Due: ₹${nextDueEmi.amount.toLocaleString('en-IN')} on ${nextDueEmi.dueDate.toISOString().split('T')[0]}`
+        : 'All Instalments Cleared (100% Paid)';
+
+      const isAttendanceQuery = lower.includes('attendance') || lower.includes('absence') || lower.includes('present') || lower.includes('missed');
+      const isFeeQuery = lower.includes('fee') || lower.includes('emi') || lower.includes('due') || lower.includes('instalment');
+      const isScheduleQuery = lower.includes('schedule') || lower.includes('batch') || lower.includes('class') || lower.includes('time') || lower.includes('trainer') || lower.includes('room');
+
+      const querySQL = `SELECT s.rollNo, s.name, b.name as batchName, c.name as courseName,
+       t.name as trainerName, b.daysOfWeek, b.startTime, b.endTime, r.name as roomName
+FROM Student s
+JOIN Enrollment e ON s.id = e.studentId
+JOIN Batch b ON e.batchId = b.id
+JOIN Course c ON b.courseId = c.id
+JOIN Trainer t ON b.trainerId = t.id
+LEFT JOIN Room r ON b.roomId = r.id
+WHERE s.id = '${student.id}' LIMIT 1;`;
+
+      const rows = [
+        {
+          id: student.id,
+          rollNo: student.rollNo,
+          name: student.name,
+          batch: batch?.name || 'Java Cohort Alpha',
+          course: batch?.course.name || 'Java Full Stack & Microservices',
+          schedule: `${batch?.daysOfWeek} @ ${batch?.startTime}-${batch?.endTime}`,
+          trainer: batch?.trainer.name || 'Priya Sharma',
+          room: batch?.room?.name || 'Room 101',
+          attendance: `${attPct}% (${presentAtt} present, ${absentAtt} absent)`,
+          feeStatus: feeStatusStr,
+          rawStudent: {
+            id: student.id,
+            rollNo: student.rollNo,
+            name: student.name,
+            email: student.email,
+            phone: student.phone,
+            city: student.city,
+            status: student.status,
+            riskScore: student.riskScore,
+            riskLevel: student.riskLevel,
+            riskReasons: ['Student Personal Learning Portal'],
+            batchName: batch?.name || 'Java Cohort Alpha',
+            courseName: batch?.course.name || 'Java Full Stack & Microservices',
+            trainerName: batch?.trainer.name || 'Priya Sharma',
+            attPct,
+            presentAtt,
+            absentAtt,
+            feeStatusStr,
+            overdueAmount: 0,
+          },
+        },
+      ];
+
+      const executionTimeMs = Date.now() - startTime;
+
+      let intent = `Retrieve personal academic telemetry and course status for ${student.name} (${student.rollNo})`;
+      if (isAttendanceQuery) intent = `Verify personal attendance records and calculate current session presence rate (${attPct}%)`;
+      if (isFeeQuery) intent = `Inspect personal fee instalment schedule and upcoming dues (${feeStatusStr})`;
+      if (isScheduleQuery) intent = `Retrieve weekly classroom schedule and trainer details for enrolled cohort ${batch?.name}`;
+
+      return {
+        plan: {
+          intent,
+          steps: [
+            `Authenticate requesting student identifier: ${student.rollNo}`,
+            `Isolate personal learning record to enforce strict student data privacy`,
+            `Load assigned cohort timetable, attendance telemetry, and upcoming instalment details`,
+          ],
+          reasoning: 'Students have private access to their personal learning telemetry, batch timetable, and fee receipts.',
+        },
+        receipt: {
+          query: querySQL,
+          tablesTouched: ['Student', 'Enrollment', 'Batch', 'Course', 'Trainer', 'AttendanceRecord'],
+          rowCount: 1,
+          executionTimeMs,
+          plainEnglishExplanation: `Retrieved personal learning dossier for ${student.name} (${student.rollNo}). Enrolled in ${batch?.name} with ${attPct}% attendance.`,
+        },
+        columns: ['rollNo', 'name', 'batch', 'schedule', 'trainer', 'room', 'attendance', 'feeStatus'],
+        rows,
+        citations: [`My Enrolled Course: ${batch?.course.name}`, `My Assigned Batch: ${batch?.name} (${batch?.daysOfWeek})`],
+      };
+    }
+  }
+
+  // =========================================================================
   // SCENARIO 0: SPECIFIC STUDENT NAME, MULTIPLE NAMES, OR ROLL NUMBER LOOKUPS
   // e.g. "Give details of Aditya Kumar", "Details for Neha Reddy", "Aditya and Neha", "STU-2026-001"
   // =========================================================================

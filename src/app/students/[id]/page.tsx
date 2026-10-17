@@ -15,6 +15,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react';
+import { AccessRestrictedCard } from '@/components/layout/AccessRestrictedCard';
 
 interface Props {
   params: { id: string };
@@ -22,6 +23,16 @@ interface Props {
 
 export default async function StudentDetailPage({ params }: Props) {
   const user = await getCurrentUser();
+
+  if (user.role === 'STUDENT' && user.studentId && params.id !== user.studentId) {
+    return (
+      <AccessRestrictedCard
+        role={user.role}
+        requiredClearance="Personal Profile Clearance"
+        reason="Students are strictly restricted from viewing other learners' personal academic or financial dossiers. You may only view your personal profile."
+      />
+    );
+  }
 
   const student = await prisma.student.findUnique({
     where: { id: params.id },

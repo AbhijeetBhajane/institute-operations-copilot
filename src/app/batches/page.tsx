@@ -4,9 +4,20 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { Layers, Calendar, DoorOpen } from 'lucide-react';
 import { BatchList } from '@/components/batches/BatchList';
+import { AccessRestrictedCard } from '@/components/layout/AccessRestrictedCard';
 
 export default async function BatchesPage() {
   const user = await getCurrentUser();
+
+  if (user.role === 'STUDENT') {
+    return (
+      <AccessRestrictedCard
+        role={user.role}
+        requiredClearance="Academic Staff Clearance (Trainer, Counselor, or Owner)"
+        reason="The Master Batches manager is restricted to academic staff. Students can view their enrolled cohort details in their personal learning portal."
+      />
+    );
+  }
 
   const batchWhere = user.role === 'TRAINER' && user.trainerId ? { trainerId: user.trainerId } : {};
   const rawBatches = await prisma.batch.findMany({

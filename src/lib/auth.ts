@@ -51,5 +51,15 @@ export function checkTableAccessForRole(role: UserRole, table: string): { allowe
     }
   }
 
+  if (role === 'STUDENT') {
+    const studentForbidden = ['reconciliationrecord', 'auditlog', 'user'];
+    if (studentForbidden.includes(normalizedTable)) {
+      return {
+        allowed: false,
+        reason: `Role 'STUDENT' has no clearance to access administrative table '${table}'. Access rejected by student security boundary.`,
+      };
+    }
+  }
+
   return { allowed: true };
 }

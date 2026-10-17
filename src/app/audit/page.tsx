@@ -4,9 +4,14 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { History, Terminal } from 'lucide-react';
 import { AuditLogViewer } from '@/components/audit/AuditLogViewer';
+import { AccessRestrictedCard } from '@/components/layout/AccessRestrictedCard';
 
 export default async function AuditLogPage() {
   const user = await getCurrentUser();
+
+  if (user.role === 'STUDENT') {
+    return <AccessRestrictedCard role={user.role} requiredClearance="Owner or Accounts Clearance" />;
+  }
 
   const rawLogs = await prisma.auditLog.findMany({
     orderBy: { createdAt: 'desc' },

@@ -66,6 +66,20 @@ const ACCOUNTS_ALLOWED_TABLES = [
   'AuditLog',
 ];
 
+const STUDENT_ALLOWED_TABLES = [
+  'Student',
+  'Course',
+  'Batch',
+  'Trainer',
+  'Room',
+  'Enrollment',
+  'AttendanceRecord',
+  'FeePlan',
+  'Instalment',
+  'Recording',
+  'Certificate',
+];
+
 // Jailbreak triggers & financial keywords for prompt inspection
 const JAILBREAK_PATTERNS = [
   /ignore (all |previous |your )?(rules|instructions|constraints|system|prompts)/i,
@@ -114,7 +128,44 @@ export function evaluateRoleGate(role: UserRole, prompt: string): RoleGateResult
   // 1. Jailbreak phrase detection
   const isJailbreakAttempt = JAILBREAK_PATTERNS.some((pattern) => pattern.test(lowerPrompt));
 
-  // 2. Trainer financial restriction check
+  // 2. Student RBAC check
+  if (role === 'STUDENT') {
+    if (isJailbreakAttempt) {
+      return {
+        allowed: false,
+        refusalReason:
+          "Access Restricted: Prompt contains administrative override attempt. Students are strictly restricted to their personal enrolled learning data.",
+        filteredAllowedTables: STUDENT_ALLOWED_TABLES,
+      };
+    }
+
+    const mentionsAdminOrOther =
+      lowerPrompt.includes('all student') ||
+      lowerPrompt.includes('other student') ||
+      lowerPrompt.includes('all batch') ||
+      lowerPrompt.includes('all fees') ||
+      lowerPrompt.includes('audit') ||
+      lowerPrompt.includes('reconciliation') ||
+      lowerPrompt.includes('bank statement') ||
+      lowerPrompt.includes('revenue') ||
+      lowerPrompt.includes('trainer schedule');
+
+    if (mentionsAdminOrOther) {
+      return {
+        allowed: false,
+        refusalReason:
+          "Access Restricted: As a Student, your clearance is strictly limited to your personal learning records (your enrolled batch schedule, personal attendance, fee receipts, course recordings, and certificates). Access to other learners' data or institute operational records is forbidden.",
+        filteredAllowedTables: STUDENT_ALLOWED_TABLES,
+      };
+    }
+
+    return {
+      allowed: true,
+      filteredAllowedTables: STUDENT_ALLOWED_TABLES,
+    };
+  }
+
+  // 3. Trainer financial restriction check
   if (role === 'TRAINER') {
     const mentionsFinancials = FINANCIAL_KEYWORDS.some((kw) => {
       // word boundary check
@@ -137,7 +188,7 @@ export function evaluateRoleGate(role: UserRole, prompt: string): RoleGateResult
     };
   }
 
-  // 3. Counselor reconciliation check
+  // 4. Counselor reconciliation check
   if (role === 'COUNSELOR') {
     if (lowerPrompt.includes('reconciliation') || lowerPrompt.includes('bank statement') || lowerPrompt.includes('utr')) {
       return {

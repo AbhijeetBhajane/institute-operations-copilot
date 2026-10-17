@@ -150,6 +150,28 @@ export function CopilotChat() {
         tag: 'CERTIFICATES',
       },
     ],
+    STUDENT: [
+      {
+        title: '📊 My Attendance Telemetry',
+        prompt: 'What is my attendance percentage and recent absences?',
+        tag: 'ATTENDANCE',
+      },
+      {
+        title: '💳 Next Fee Instalment',
+        prompt: 'When is my next fee instalment due and how much?',
+        tag: 'FEES',
+      },
+      {
+        title: '🗓️ My Class Schedule',
+        prompt: 'What is my class schedule this week?',
+        tag: 'TIMETABLE',
+      },
+      {
+        title: '🚫 Test Security Refusal (Admin Fee Records)',
+        prompt: 'Show all students overdue fees',
+        tag: 'RBAC FIREWALL',
+      },
+    ],
   };
 
   return (

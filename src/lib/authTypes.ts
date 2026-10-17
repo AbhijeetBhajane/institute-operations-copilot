@@ -1,4 +1,4 @@
-export type UserRole = 'OWNER' | 'COUNSELOR' | 'TRAINER' | 'ACCOUNTS';
+export type UserRole = 'OWNER' | 'COUNSELOR' | 'TRAINER' | 'ACCOUNTS' | 'STUDENT';
 
 export interface AuthUser {
   id: string;
@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   trainerId?: string | null;
+  studentId?: string | null;
 }
 
 export const PRESET_USERS: Record<UserRole, AuthUser> = {
@@ -34,6 +35,13 @@ export const PRESET_USERS: Record<UserRole, AuthUser> = {
     email: 'accounts@classpilot.io',
     role: 'ACCOUNTS',
   },
+  STUDENT: {
+    id: 'usr-student-aditya',
+    name: 'Aditya Kumar (Student)',
+    email: 'aditya.kumar1@student.classpilot.io',
+    role: 'STUDENT',
+    studentId: 'stu-001',
+  },
 };
 
 export const ROLE_PERMISSIONS: Record<
@@ -45,6 +53,7 @@ export const ROLE_PERMISSIONS: Record<
     canViewAllBatches: boolean;
     canApproveFinancialActions: boolean;
     canExportAuditLogs: boolean;
+    isStudentPortal?: boolean;
   }
 > = {
   OWNER: {
@@ -54,6 +63,7 @@ export const ROLE_PERMISSIONS: Record<
     canViewAllBatches: true,
     canApproveFinancialActions: true,
     canExportAuditLogs: true,
+    isStudentPortal: false,
   },
   COUNSELOR: {
     canViewFees: true,
@@ -62,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<
     canViewAllBatches: true,
     canApproveFinancialActions: false,
     canExportAuditLogs: false,
+    isStudentPortal: false,
   },
   TRAINER: {
     canViewFees: false, // STRICTLY FORBIDDEN
@@ -70,6 +81,7 @@ export const ROLE_PERMISSIONS: Record<
     canViewAllBatches: false,
     canApproveFinancialActions: false,
     canExportAuditLogs: false,
+    isStudentPortal: false,
   },
   ACCOUNTS: {
     canViewFees: true,
@@ -78,5 +90,16 @@ export const ROLE_PERMISSIONS: Record<
     canViewAllBatches: true,
     canApproveFinancialActions: true,
     canExportAuditLogs: true,
+    isStudentPortal: false,
+  },
+  STUDENT: {
+    canViewFees: false, // Cannot view global fee tables or other students' finances
+    canViewReconciliation: false, // STRICTLY FORBIDDEN
+    canEditAcademics: false, // Cannot alter schedules or marks
+    canViewAllBatches: false, // Only views their enrolled batch
+    canApproveFinancialActions: false,
+    canExportAuditLogs: false,
+    isStudentPortal: true,
   },
 };
+

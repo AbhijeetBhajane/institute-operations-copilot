@@ -43,6 +43,7 @@ export function RoleSwitcher() {
     COUNSELOR: { bg: 'bg-teal/10 border-teal/30', text: 'text-teal dark:text-teal-light', badge: 'bg-teal text-white' },
     TRAINER: { bg: 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800', text: 'text-indigo-700 dark:text-indigo-300', badge: 'bg-indigo-600 text-white' },
     ACCOUNTS: { bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800', text: 'text-emerald-700 dark:text-emerald-300', badge: 'bg-emerald-600 text-white' },
+    STUDENT: { bg: 'bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800', text: 'text-sky-700 dark:text-sky-300', badge: 'bg-sky-600 text-white' },
   };
 
   const user = PRESET_USERS[currentRole];
@@ -102,6 +103,7 @@ export function RoleSwitcher() {
                         {r === 'COUNSELOR' && 'Student 360, retention reminders (no bank recon)'}
                         {r === 'TRAINER' && 'Only assigned cohort (STRICT zero fee/payment access)'}
                         {r === 'ACCOUNTS' && 'Fee ledger, statement reconciliation, certificates'}
+                        {r === 'STUDENT' && 'Personal learning portal, timetable, fee receipts, and recordings'}
                       </p>
                     </div>
                     {isActive && <Check className="w-4 h-4 text-saffron flex-shrink-0 mt-1" />}

@@ -17,19 +17,27 @@ import {
   MessageSquare,
   Moon,
   Sun,
+  Video,
+  BookOpen,
   Search,
   Command,
 } from 'lucide-react';
 import { RoleSwitcher } from './RoleSwitcher';
+import { UserRole, PRESET_USERS } from '@/lib/authTypes';
 
 export function Navbar() {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
+  const [currentRole, setCurrentRole] = useState<UserRole>('OWNER');
 
   useEffect(() => {
     // Check initial dark mode
     if (document.documentElement.classList.contains('dark')) {
       setIsDark(true);
+    }
+    const match = document.cookie.match(/classpilot_role=([^;]+)/);
+    if (match && match[1] && PRESET_USERS[match[1] as UserRole]) {
+      setCurrentRole(match[1] as UserRole);
     }
   }, []);
 
@@ -43,7 +51,7 @@ export function Navbar() {
     }
   };
 
-  const navLinks = [
+  const adminNavLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: Compass },
     { href: '/copilot', label: 'AI Copilot', icon: Sparkles, hero: true },
     { href: '/timetable', label: 'Timetable', icon: Calendar },
@@ -56,6 +64,17 @@ export function Navbar() {
     { href: '/audit', label: 'Audit Log', icon: History },
     { href: '/whatsapp', label: 'Outbox', icon: MessageSquare },
   ];
+
+  const studentNavLinks = [
+    { href: '/dashboard', label: 'My Learning Portal', icon: Compass },
+    { href: '/copilot', label: 'Student AI Copilot', icon: Sparkles, hero: true },
+    { href: '/recordings', label: 'Class Recordings', icon: Video },
+    { href: '/certificates', label: 'My Certificates', icon: FileText },
+    { href: '/students/stu-001', label: 'My Dossier & Profile', icon: Users },
+  ];
+
+  const navLinks = currentRole === 'STUDENT' ? studentNavLinks : adminNavLinks;
+
 
   return (
     <header className="sticky top-0 z-30 bg-paper-100/90 dark:bg-paper-900/90 backdrop-blur-md border-b border-paper-300 dark:border-paper-800 transition-colors">

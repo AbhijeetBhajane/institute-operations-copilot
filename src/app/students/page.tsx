@@ -4,9 +4,20 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { Users, ArrowRight } from 'lucide-react';
 import { StudentDirectory } from '@/components/students/StudentDirectory';
+import { AccessRestrictedCard } from '@/components/layout/AccessRestrictedCard';
 
 export default async function StudentsPage() {
   const user = await getCurrentUser();
+
+  if (user.role === 'STUDENT') {
+    return (
+      <AccessRestrictedCard
+        role={user.role}
+        requiredClearance="Counselor, Trainer, or Owner Clearance"
+        reason="Students only have access to their personal Student 360 dossier and learning portal. Browsing the master directory of other enrolled learners is restricted."
+      />
+    );
+  }
 
   const studentWhere =
     user.role === 'TRAINER' && user.trainerId

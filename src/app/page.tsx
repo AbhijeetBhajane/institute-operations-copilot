@@ -63,7 +63,7 @@ export default function LandingPage() {
             <span className="text-saffron-dark dark:text-saffron font-bold">RBAC Enforced</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
             <button
               onClick={() => loginAsRole('OWNER')}
               disabled={!!switching}
@@ -110,6 +110,18 @@ export default function LandingPage() {
               </span>
               <p className="text-xs font-bold text-ink dark:text-paper-100 mt-1">Suresh A.</p>
               <p className="text-[10px] text-ink-muted dark:text-ink-subtle">Ledger & Recon</p>
+            </button>
+
+            <button
+              onClick={() => loginAsRole('STUDENT')}
+              disabled={!!switching}
+              className="p-3 rounded-xl border border-paper-300 dark:border-paper-700 bg-paper-50 dark:bg-paper-900 hover:border-sky-400 hover:shadow-sm text-left transition-all col-span-2 sm:col-span-1"
+            >
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-600 text-white font-bold">
+                STUDENT
+              </span>
+              <p className="text-xs font-bold text-ink dark:text-paper-100 mt-1">Aditya K.</p>
+              <p className="text-[10px] text-sky-600 dark:text-sky-400 font-bold">Learning Portal</p>
             </button>
           </div>
         </div>

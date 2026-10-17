@@ -1,8 +1,22 @@
 import React from 'react';
 import { MessageSquare } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
 import { WhatsAppOutboxViewer } from '@/components/whatsapp/WhatsAppOutboxViewer';
+import { AccessRestrictedCard } from '@/components/layout/AccessRestrictedCard';
 
-export default function WhatsAppOutboxPage() {
+export default async function WhatsAppOutboxPage() {
+  const user = await getCurrentUser();
+
+  if (user.role === 'STUDENT') {
+    return (
+      <AccessRestrictedCard
+        role={user.role}
+        requiredClearance="Staff Outreach Clearance (Owner, Counselor, or Accounts)"
+        reason="The WhatsApp Outbox Queue is for institute administrators and mentors to stage and verify outgoing notifications. Students cannot manage the messaging outbox."
+      />
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
