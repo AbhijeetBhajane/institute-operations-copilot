@@ -56,6 +56,7 @@ export interface CopilotQueryResult {
   actionPreview?: ActionPreviewData;
   refused?: boolean;
   refusalReason?: string;
+  executiveSummary?: string;
 }
 
 export interface CopilotRequestPayload {

@@ -340,6 +340,27 @@ export function CopilotChat() {
             </div>
           )}
 
+          {/* AI Copilot Executive Response Card */}
+          {!result.refused && (result.executiveSummary || result.plan?.intent) && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-saffron/15 via-paper-50 to-teal/15 dark:from-saffron/10 dark:via-paper-800 dark:to-teal/10 border-2 border-saffron/50 dark:border-saffron/40 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-saffron animate-pulse" />
+                  <span className="font-mono text-xs font-bold text-saffron-dark dark:text-saffron uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 fill-saffron/30" />
+                    AI Copilot Executive Answer
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white dark:bg-paper-900 border border-paper-300 dark:border-paper-700 text-ink-muted">
+                  {result.receipt?.rowCount ?? result.rows?.length ?? 0} records analyzed
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-ink dark:text-paper-100 leading-relaxed font-sans">
+                {result.executiveSummary || result.plan?.intent}
+              </p>
+            </div>
+          )}
+
           {/* Structured Plan Card */}
           {!result.refused && result.plan && (
             <div className="p-4 rounded-2xl bg-paper-100 dark:bg-paper-800/80 border border-paper-300 dark:border-paper-700/80 space-y-2">
